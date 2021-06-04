@@ -8,14 +8,29 @@ from algosdk.v2client import algod, indexer
 import requests
 import json
 import time
+import base64
+from pymongo.encryption_options import AutoEncryptionOpts
+from pymongo.errors import EncryptionError
+from bson import json_util
+import pickle 
+
+propertyFile= "filename" #define name of file that holds all relevant bot propertie here
+with open(propertyFile, 'rb') as input:
+    botProperties = pickle.load(input)
+
+csfle_opts=AutoEncryptionOpts(botProperties['kmsProviders'], 
+                              botProperties['keyVaultNamespace']
+                            )
+
+connect(db=botProperties['dbTest'], host=botProperties['dbHost'], auto_encryption_opts=csfle_opts)
+
+
 
 intents = discord.Intents.default()
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
-algoNode = algod.AlgodClient(nodeToken, nodeAddr)
-#purestakeUrl = "https://mainnet-algorand.api.purestake.io/idx"
-purestakeUrl = "https://testnet-algorand.api.purestake.io/idx2"
-algoIndexer = indexer.IndexerClient(indexer_token="", indexer_address=purestakeUrl, headers=purestakeHeader)
+algoNode = algod.AlgodClient(botProperties['algoNodeToken'], botProperties['algoNodeAddr'])
+
 class DiscordWallet(Document):
     userId = LongField(required=True)
     address = StringField(required=True)
@@ -105,7 +120,8 @@ async def get_seed(ctx):
        await ctx.message.channel.send("No wallet exists for {0.author}. Create one using !mkWallet".format(ctx))
    else:
        ppk = DiscordWallet.objects(userId=ctx.author.id)[0]['ppk']
-       await ctx.author.send("25 Word mnemonic seed: {}".format(mnemonic.from_private_key(ppk)))
+       #send seed phrase marked as spoiler
+       await ctx.author.send("|| 25 Word mnemonic seed: {} ||".format(mnemonic.from_private_key(ppk)))
        if not isinstance(ctx.message.channel, discord.channel.DMChannel):
            await ctx.message.channel.send("Attention {0.author} Check DM for seed phrase".format(ctx) )
 
@@ -153,6 +169,12 @@ async def mint(ctx):
        if not 'frozen' in assetParams:
            assetParams['frozen'] = False
        else:
+           if assetParams['frozen'].lower() == "true":
+               assetParams['frozen'] = True
+           else:
+               assetParams['frozen'] = False
+            
+
            assetParams['frozen'] = bool(assetParams['frozen'])
        if not 'freezeaddr' in assetParams:
            assetParams['freezeaddr'] = address
@@ -578,4 +600,6 @@ async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str
        print(err)
        await ctx.channel.send("{} Error Sending {} {} (ASA ID{}) to {}:{}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), assetInfo['asset']['params']['unit-name'], asaId, address, err))
 
-bot.run(TOKEN)
+bot.run(botProperties['botToken'])
+#bot.run(botProperties['botTestToken'])
+#bot.run(TOKEN)
