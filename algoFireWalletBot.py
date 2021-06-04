@@ -1,7 +1,5 @@
 import discord
 from discord.ext import commands
-from mongoengine import connect
-from mongoengine import Document, StringField, LongField
 from algosdk import account, mnemonic
 from algosdk.future import transaction
 from algosdk.v2client import algod, indexer
@@ -9,12 +7,14 @@ import requests
 import json
 import time
 import base64
+import pickle 
+from db.DiscordWallet import DiscordWallet
+from mongoengine import connect
 from pymongo.encryption_options import AutoEncryptionOpts
 from pymongo.errors import EncryptionError
 from bson import json_util
-import pickle 
 
-propertyFile= "filename" #define name of file that holds all relevant bot propertie here
+propertyFile= "filename" #define name of file that holds all relevant bot properties here
 with open(propertyFile, 'rb') as input:
     botProperties = pickle.load(input)
 
@@ -25,16 +25,12 @@ csfle_opts=AutoEncryptionOpts(botProperties['kmsProviders'],
 connect(db=botProperties['dbTest'], host=botProperties['dbHost'], auto_encryption_opts=csfle_opts)
 
 
-
+#enable intents in order to 
 intents = discord.Intents.default()
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 algoNode = algod.AlgodClient(botProperties['algoNodeToken'], botProperties['algoNodeAddr'])
 
-class DiscordWallet(Document):
-    userId = LongField(required=True)
-    address = StringField(required=True)
-    ppk = StringField(required=True)
 
 def wait_for_confirmation(client, transaction_id, timeout):
     start_round = client.status()["last-round"]+1;
