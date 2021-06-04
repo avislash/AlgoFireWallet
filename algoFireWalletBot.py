@@ -596,6 +596,36 @@ async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str
        print(err)
        await ctx.channel.send("{} Error Sending {} {} (ASA ID{}) to {}:{}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), assetInfo['asset']['params']['unit-name'], asaId, address, err))
 
+@bot.command(name="distributeASA", help="Mass distribute ASA token to users with specified Discord Role")
+async def distribute(ctx, amount: float,  asaId: int, role:discord.Role, *, note:str=""):
+   senderWallet = DiscordWallet.objects(userId=ctx.author.id)
+   if not senderWallet:
+       await ctx.channel.send("No wallet exists for {0.author}. Create one using !mkWallet".format(ctx))
+       return
+   else:
+       senderWallet = senderWallet[0]
+
+   #Make sure sender is opted into asset they're trying to send
+   account_info = algoNode.account_info(senderWallet['address'])
+   foundAsset = False
+   for asset in account_info['assets']:
+       if asaId == asset['asset-id']:
+           foundAsset = True
+           break
+   if not foundAsset:
+       await ctx.channel.send("ASA ID #{} not found in {}'s holdings".format(asaId, ctx.author))
+       return
+
+   numMembers = len(role.members)
+   await ctx.channel.send("Beginning ASA ID#{} distribution to {} members in {}".format(asaId, numMembers, role))
+   for member in role.members:
+       try:
+           username = "<@!{}>".format(member.id) #convert member.id to an @discord_username (this gets rendered to the proper username in discord chat)
+           await send_asa(ctx=ctx, amount=amount, username=username, asaId=asaId, note=note)
+       except Exception as e:
+           await ctx.channel.send("Attention {} - Failed to distribute ASA ID #{} to {}: {}".format(ctx.author, asaId, uesrname, e))
+   await ctx.channel.send("ASA ID#{} distribution for {} in {} finished".format(asaId, numMembers, role))
+ 
 bot.run(botProperties['botToken'])
 #bot.run(botProperties['botTestToken'])
 #bot.run(TOKEN)
