@@ -443,7 +443,11 @@ async def get_balance(ctx, flex:str=""):
                decimals = assetInfo['asset']['params']['decimals']
                scaleFactor = 10 ** (-1*decimals)
                amount = amount*scaleFactor
-               coins.append("{} {} (Asset ID #{})".format(format(amount, '.{}f'.format(decimals)), assetInfo['asset']['params']['unit-name'], asset['asset-id']))
+               if 'unit-name' in assetInfo['asset']['params']:
+                   unitName = assetInfo['asset']['params']['unit-name']
+               else:
+                   unitName = ""
+               coins.append("{} {} (Asset ID #{})".format(format(amount, '.{}f'.format(decimals)), unitName, asset['asset-id']))
                #coins.append(str(amount) +" "+ assetInfo['asset']['params']['unit-name'])
            except Exception as e:
                print(e)
