@@ -368,13 +368,13 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
        wallet = DiscordWallet(userId = recipientId, address = address, ppk=ppk)
        wallet.save()
        recipientWallet = DiscordWallet.objects(userId=recipientId)[0]
-       neww_wallet = True
+       zeroBalance = True
        await recipient.send("New Wallet Created: {}".format(address))
        await ctx.message.channel.send("New Wallet Created for {0.name}".format(recipient))
    else:
        recipientWallet = recipientWallet[0]
        account_info = algoNode.account_info(recipientWallet['address'])
-
+       zeroBalance = not (account_info['amount'] > 0)
        for asset in account_info['assets']:
            if asaId == asset['asset-id']:
                optRecipientIn = False
@@ -392,13 +392,13 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
        try:
            optin_fee = 0.001 #Algo
            minimum_balance_increase = .100#Algo
-           new_wallet_min_balance = .100#Algo
+           zero_wallet_min_balance = .100 #Send an additional .100A if the wallet has a 0 balance
+                                          #this is so that the balance can be brought up to the Algorand minimum
+                                          #required for transcating with the account
 
-           amount_to_send = optin_fee + minimum_balance_increase + (new_wallet_min_balance if True == newWallet else 0)
+           amount_to_send = optin_fee + minimum_balance_increase + (zero_wallet_min_balance if True == zeroBalance else 0)
            amount_to_send = int(amount_to_send*1e6)
-           #print("Sending {} ALGO to allow for optin".format(amount_to_send))
-           #unsigned_tx = transaction.PaymentTxn(senderAddr, params, recipientAddr, amount_to_send, None)
-           #print(amount_to_send)
+
            unsigned_optin_fee_txn = transaction.PaymentTxn(senderWallet['address'], params, recipientWallet['address'], amount_to_send, None, note="Optin fee".encode())
            asaTxferGroup.append(unsigned_optin_fee_txn)
            unsigned_optin_txn = transaction.AssetTransferTxn(sender=recipientWallet['address'], sp=params, receiver=recipientWallet['address'], amt=0, index=asaId)
