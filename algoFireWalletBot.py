@@ -66,6 +66,14 @@ def getAssetInfo(assetId):
 
    return asset_info
 
+def getASAUnitName(assetInfo):
+   if 'unit-name' not in assetInfo['asset']['params']:
+       unitName = ""
+   else:
+       unitName = assetInfo['asset']['params']['unit-name']
+
+   return unitName
+
 def parseArgs(args):
    argsDict = {}
    for arg in args:
@@ -228,15 +236,18 @@ async def optin(ctx, asaId: int):
        wallet = wallet[0]
 
    assetInfo = getAssetInfo(asaId)
+
    if not 'asset' in assetInfo:
        await ctx.channel.send("Unable to add ASA ID #{} for {}: ASA does not exist".format(asaId, ctx.author))
        return
+
+   unitName = getASAUnitName(assetInfo)
 
    accountInfo = algoNode.account_info(wallet['address'])
 
    for asset in accountInfo['assets']:
        if asaId == asset['asset-id']:
-           message = "Already opted into {} (ASA ID#{})".format(assetInfo['asset']['params']['unit-name'], asaId)
+           message = "Already opted into {} (ASA ID#{})".format(unitName, asaId)
            if not isinstance(ctx.message.channel, discord.channel.DMChannel):
                message = "{} ".format(ctx.author) + message
            await ctx.channel.send(message)
@@ -247,7 +258,8 @@ async def optin(ctx, asaId: int):
 
        txid = algoNode.send_transaction(signed_optin)
        wait_for_confirmation(algoNode, txid, 5)
-       message = "Succesfully added {} (ASA ID#{})".format(assetInfo['asset']['params']['unit-name'], asaId)
+
+       message = "Succesfully added {} (ASA ID#{})".format(unitName, asaId)
 
        if not isinstance(ctx.message.channel, discord.channel.DMChannel):
            message = message + " for {}".format(ctx.author)
@@ -354,7 +366,9 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
            if asaId == asset['asset-id']:
                optRecipientIn = False
                break
+
    assetInfo = getAssetInfo(asaId)
+   unitName = getASAUnitName(assetInfo)
 
    asaTxferGroup=[] #Order will always be Send .001 Algo to opt user in, opt user in, send ASA
    try:
@@ -379,7 +393,7 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
            unsigned_optin_txn = transaction.AssetTransferTxn(sender=recipientWallet['address'], sp=params, receiver=recipientWallet['address'], amt=0, index=asaId)
            asaTxferGroup.append(unsigned_optin_txn)
        except Exception as e:
-           await ctx.message.channel.send("Attention {} Unable to send {} {} (ASA ID# {}) to {} Failed to  generate optin xfer group: {}".format(ctx.author, amount, assetInfo['asset']['params']['unit-name'], asaId, username, e))
+           await ctx.message.channel.send("Attention {} Unable to send {} {} (ASA ID# {}) to {} Failed to  generate optin xfer group: {}".format(ctx.author, amount, unitName, asaId, username, e))
            return
 
    #print(assetInfo)
@@ -417,8 +431,8 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
 
    try:
        wait_for_confirmation(algoNode, txid, 5)
-       await ctx.channel.send("{} sent {} {} to {}".format(ctx.author, (asaAmtToSend*10**(-1*decimals)), assetInfo['asset']['params']['unit-name'], username))
-       await recipient.send("{} sent you {} {} ASA ID#{} {}".format(ctx.author, asaAmtToSend*10**(-1*decimals),assetInfo['asset']['params']['unit-name'], asaId, ("with note: {}".format(note) if note else ""  )))
+       await ctx.channel.send("{} sent {} {} to {}".format(ctx.author, (asaAmtToSend*10**(-1*decimals)), unitName, username))
+       await recipient.send("{} sent you {} {} ASA ID#{} {}".format(ctx.author, asaAmtToSend*10**(-1*decimals), unitName, asaId, ("with note: {}".format(note) if note else ""  )))
    except Exception as e:
        await ctx.channel.send("Attention {} Error sending ASA ID #{} to {} : {}".format(ctx.author, asaId, username, e))
      
@@ -443,12 +457,7 @@ async def get_balance(ctx, flex:str=""):
                decimals = assetInfo['asset']['params']['decimals']
                scaleFactor = 10 ** (-1*decimals)
                amount = amount*scaleFactor
-               if 'unit-name' in assetInfo['asset']['params']:
-                   unitName = assetInfo['asset']['params']['unit-name']
-               else:
-                   unitName = ""
-               coins.append("{} {} (Asset ID #{})".format(format(amount, '.{}f'.format(decimals)), unitName, asset['asset-id']))
-               #coins.append(str(amount) +" "+ assetInfo['asset']['params']['unit-name'])
+               coins.append("{} {} (Asset ID #{})".format(format(amount, '.{}f'.format(decimals)), getASAUnitName(assetInfo), asset['asset-id']))
            except Exception as e:
                print(e)
                coins.append("Unable to get Balance for Asset ID {}".format(asset['asset-id']))
@@ -561,6 +570,8 @@ async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str
        return
 
    assetInfo = getAssetInfo(asaId)
+   unitName = getASAUnitName(assetInfo)
+
    decimals = assetInfo['asset']['params']['decimals']
    asaAmtToSend = int(amount * (10**decimals))
    #print("Address len {}".format(len(address)))
@@ -570,10 +581,10 @@ async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str
 
        txid = algoNode.send_transaction(signed_asaXfer)
        wait_for_confirmation(algoNode, txid, 5)
-       await ctx.channel.send("{} sent {} {} (ASA ID{}) to {}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), assetInfo['asset']['params']['unit-name'], asaId, address))
+       await ctx.channel.send("{} sent {} {} (ASA ID #{}) to {}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), unitName, asaId, address))
    except Exception as err:
        print(err)
-       await ctx.channel.send("{} Error Sending {} {} (ASA ID{}) to {}:{}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), assetInfo['asset']['params']['unit-name'], asaId, address, err))
+       await ctx.channel.send("{} Error Sending {} {} (ASA ID #{}) to {}:{}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), unitName, asaId, address, err))
 
 @bot.command(name="distributeASA", help="Mass distribute ASA token to users with specified Discord Role")
 async def distribute(ctx, amount: float,  asaId: int, role:discord.Role, *, note:str=""):
@@ -596,7 +607,7 @@ async def distribute(ctx, amount: float,  asaId: int, role:discord.Role, *, note
        return
 
    numMembers = len(role.members)
-   await ctx.channel.send("Beginning ASA ID#{} distribution to {} members in {}".format(asaId, numMembers, role))
+   await ctx.channel.send("Beginning ASA ID #{} distribution to {} members in {}".format(asaId, numMembers, role))
    for member in role.members:
        try:
            username = "<@!{}>".format(member.id) #convert member.id to an @discord_username (this gets rendered to the proper username in discord chat)
