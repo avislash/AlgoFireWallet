@@ -130,68 +130,42 @@ async def get_address(ctx):
        await ctx.message.channel.send("{}'s address: {}".format(ctx.author, address))
 
 @bot.command(name='mint', help="Create an ASA")
-async def mint(ctx):
+async def mint(ctx, total:int, decimals:int, assetName:str="", unitName:str="", url:str="", *, options:str=""):
    if not DiscordWallet.objects(userId=ctx.author.id):
        await ctx.channel.send("No wallet exists for {0.author}. Create one using !mkWallet".format(ctx))
        return
-   #print(ctx.message.content)
+
    #Parse Message for asset params
    try:
-       args = ctx.message.content.lstrip("!mint").split(",")
-       assetParams = {}
+       #print(options)
+       #:wargs = options.split(",")
+       #print(args)
        wallet = DiscordWallet.objects(userId=ctx.author.id)
 
-       address = wallet[0]['address'] #DiscordWallet.objects(userId=ctx.author.id)[0]['address']
-       #print("Address {}".format(address))
-       assetParams = parseArgs(args)
-       #for arg in args:
-       #    assetParams[arg.split("=")[0].lstrip(' ').lower()] = arg.split("=")[1].lstrip(' ')
-           
-       #validate args
-       #print("Validating args")
-       try:
-           if not 'total' in assetParams:
-               raise Exception("total")
-           elif not 'decimals' in assetParams:
-               raise Exception("decimals")
-           #elif not 'frozen' in assetParams:
-           #    raise Exception("frozen")
-       except Exception as missingArg:
-           await ctx.channel.send("Error Minting tokens for {0.author}. Missing {} arg".format(ctx, missingArg))
-           return
-       
-       #Fill in missing parameters
-       #print("Args Validated")
+       address = wallet[0]['address'] 
+
+       assetParams = parseArgs(options.split(","))
+
        if not 'frozen' in assetParams:
            assetParams['frozen'] = False
        else:
-           if assetParams['frozen'].lower() == "true":
-               assetParams['frozen'] = True
-           else:
-               assetParams['frozen'] = False
-            
+           assetParams['frozen'] = (assetParams['frozen'].lower == "true")
 
-           assetParams['frozen'] = bool(assetParams['frozen'])
        if not 'freezeaddr' in assetParams:
            assetParams['freezeaddr'] = address
-       else:
-           if "null" == assetParams['freezeaddr'].lower():
+       elif "null" == assetParams['freezeaddr'].lower():
                assetParams['freezeaddr'] = None
-       if not 'assetname' in assetParams:
-           assetParams['assetname'] = ""
-       if not 'unitname' in assetParams:
-           asseParams['unitname'] = ""
-       if not 'url' in assetParams:
-           assetParams['url'] = ""
-       if not 'metadata' in assetParams:
-           assetParams['metadata'] = ""
-       if not "clawback" in assetParams:
-           assetParams["clawback"] = address
-       else:
-           if "null" == assetParams['clawback'].lower():
-               assetParams['clawback'] = None
 
-           
+       if not 'metadata' in assetParams:
+           assetParams['metadata'] = None
+       else:
+           assetParams['metadata'] = bytes(assetParams['metadata'], "ascii")
+
+       if not "clawback" in assetParams:
+           assetParams['clawback']=address
+       elif "null" == assetParams['clawback'].lower():
+           assetParams['clawback']=None
+
        #print("Getting network params")
        try:
            networkParams = algoNode.suggested_params()
@@ -205,15 +179,16 @@ async def mint(ctx):
            aTxn = transaction.AssetConfigTxn( sender=address,
                                               sp = networkParams,
                                               default_frozen=assetParams['frozen'],
-                                              unit_name=assetParams['unitname'],
-                                              asset_name=assetParams['assetname'],
-                                              total = int(assetParams['total']),
+                                              unit_name=unitName, #assetParams['unitname'],
+                                              asset_name=assetName, #assetParams['assetname'],
+                                              total = total,  #int(assetParams['total']),
+                                              metadata_hash = assetParams['metadata'],
                                               manager = address,
                                               reserve = address,
                                               freeze = assetParams['freezeaddr'],
                                               clawback=assetParams['clawback'],
-                                              decimals = int(assetParams['decimals']),
-                                              url = assetParams['url'],
+                                              decimals = decimals, #int(assetParams['decimals']),
+                                              url = url, #assetParams['url'],
                                               strict_empty_address_check=False
                                             )
        except Exception as e:
@@ -229,12 +204,12 @@ async def mint(ctx):
            wait_for_confirmation(algoNode, txid, 5)
        except Exception as e:
            await ctx.channel.send("Error Minting tokens for {0.author}. Failed to submit txn to Algorand Network: {1}".format(ctx, e))
-           print(e)
+           print(type)
            #print("Failed to send transaction")
        try:
            ptx = algoNode.pending_transaction_info(txid)
            assetId = ptx["asset-index"]
-           await ctx.channel.send("{0.author} successfully minited asset id #{1}".format(ctx, assetId))
+           await ctx.channel.send("{0.author} successfully minited asset id #{1}: https://www.randgallery.com/algo-collection?address={2}&testnet".format(ctx, assetId,assetId))
        except Exception as e:
            await ctx.channel.send("Error Minting tokens for {0.author}: {1}".format(ctx, e))
            print(e)
