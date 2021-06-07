@@ -217,7 +217,7 @@ async def mint(ctx, total:int, decimals:int, assetName:str="", unitName:str="", 
        try:
            ptx = algoNode.pending_transaction_info(txid)
            assetId = ptx["asset-index"]
-           await ctx.channel.send("{0.author} successfully minited asset id #{1}: https://www.randgallery.com/algo-collection?address={2}&testnet".format(ctx, assetId,assetId))
+           await ctx.channel.send("{0.author} successfully minted asset id #{1}: https://www.randgallery.com/algo-collection?address={2}&testnet".format(ctx, assetId,assetId))
        except Exception as e:
            await ctx.channel.send("Error Minting tokens for {0.author}: {1}".format(ctx, e))
            print(e)
