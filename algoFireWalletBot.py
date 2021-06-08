@@ -28,7 +28,7 @@ connect(db=botProperties['dbTest'], host=botProperties['dbHost'], auto_encryptio
 #enable intents in order to 
 intents = discord.Intents.default()
 intents.members = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', case_insensitive=True, intents=intents)
 algoNode = algod.AlgodClient(botProperties['algoNodeToken'], botProperties['algoNodeAddr'])
 
 
