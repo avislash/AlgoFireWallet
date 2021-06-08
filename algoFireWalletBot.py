@@ -147,6 +147,7 @@ async def get_address(ctx):
        address = DiscordWallet.objects(userId=ctx.author.id)[0]['address']
        await ctx.message.channel.send("{}'s address: {}".format(ctx.author, address))
 
+
 @bot.command(name='mint', help="Create an ASA")
 async def mint(ctx, total:int, decimals:int, assetName:str="", unitName:str="", url:str="", *, options:str=""):
    if not DiscordWallet.objects(userId=ctx.author.id):
@@ -228,6 +229,10 @@ async def mint(ctx, total:int, decimals:int, assetName:str="", unitName:str="", 
        await ctx.channel.send("Error Minting tokens for {0.author}: {1}".format(ctx,e))
        print(e)
 
+@mint.error
+async def mint_error(ctx, error):
+    await ctx.send("Failed to execute !mint for {}: {}".format(ctx.author, error))
+
 @bot.command(name="add-asa", help="Add ASA to account")
 async def optin(ctx, asaId: int):
    wallet = DiscordWallet.objects(userId=ctx.author.id)
@@ -275,6 +280,9 @@ async def optin(ctx, asaId: int):
        message = message + ": {}".format(e)
        await ctx.channel.send(message)
 
+@optin.error
+async def optin_error(ctx, error):
+    await ctx.send("Failed to execute !add-asa for {}: {}".format(ctx.author, error))
 
 @bot.command(name="remove-asa", help="Remove ASA from account")
 async def optout(ctx, asaId: int):
@@ -320,6 +328,10 @@ async def optout(ctx, asaId: int):
    except Exception as e:
        await ctx.channel.send("{} Unable to opt out of ASA ID# {}: {}".format(ctx.author, asaId, e))
        print(e)
+
+@optout.error
+async def optout_error(ctx, error):
+    await ctx.send("Failed to execute !remove-asa for {}: {}".format(ctx.author, error))
        
 @bot.command(name="sendASA", help="Send Algorand ASA to Discord User")
 async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
@@ -438,6 +450,9 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
    except Exception as e:
        await ctx.channel.send("Attention {} Error sending ASA ID #{} to {} : {}".format(ctx.author, asaId, username, e))
      
+@send_asa.error
+async def send_asa_error(ctx, error):
+    await ctx.send("Failed to execute !sendASA for {}: {}".format(ctx.author, error))
 
 @bot.command(name='balance', help="Get Algorand Account Balance")
 async def get_balance(ctx, flex:str=""):
@@ -520,6 +535,10 @@ async def send_algo(ctx, algo: float,  username: str, *, note:str=""):
    except Exception as err:
        await ctx.message.channel.send("Attention {} failed to send {} Algo to {}: {}".format(ctx.author, algo, username, err))
 
+@send_algo.error
+async def send_algo_error(ctx, error):
+    await ctx.send("Failed to execute !sendAlgo for {}: {}".format(ctx.author, error))
+
 @bot.command(name="withdrawAlgo", help="Send Algo to external Algorand Account")
 async def withdraw_algo(ctx, amount: float, address: str, *, note:str=""):
    wallet = DiscordWallet.objects(userId=ctx.author.id)
@@ -545,6 +564,10 @@ async def withdraw_algo(ctx, amount: float, address: str, *, note:str=""):
        await send_embed(ctx,"[{} sent {} Algo to {}]({})".format(ctx.author, amount, address, algoExplorerTxnUrl.format(txid))) 
    except Exception as err:
        await ctx.message.channel.send("Attention {} failed to send {} ALGO to {}: {}".format(ctx.author, amount, address, err))
+
+@withdraw_algo.error
+async def withdraw_algo_error(ctx, error):
+    await ctx.send("Failed to execute !withdrawAlgo for {}: {}".format(ctx.author, error))
    
 @bot.command(name="withdrawASA", help="Send Algorand ASA to external Algorand Account")
 async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str=""):
@@ -588,6 +611,10 @@ async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str
        print(err)
        await ctx.channel.send("{} Error Sending {} {} (ASA ID #{}) to {}:{}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), unitName, asaId, address, err))
 
+@withdrawASA.error
+async def withdraw_asa_error(ctx, error):
+    await ctx.send("Failed to execute !withdrawASA for {}: {}".format(ctx.author, error))
+
 @bot.command(name="distributeASA", help="Mass distribute ASA token to users with specified Discord Role")
 async def distribute(ctx, amount: float,  asaId: int, role:discord.Role, *, note:str=""):
    senderWallet = DiscordWallet.objects(userId=ctx.author.id)
@@ -617,6 +644,10 @@ async def distribute(ctx, amount: float,  asaId: int, role:discord.Role, *, note
        except Exception as e:
            await ctx.channel.send("Attention {} - Failed to distribute ASA ID #{} to {}: {}".format(ctx.author, asaId, uesrname, e))
    await ctx.channel.send("ASA ID#{} distribution for {} in {} finished".format(asaId, numMembers, role))
+
+@distribute.error
+async def distribute_error(ctx, error):
+    await ctx.send("Failed to execute !distributeASA for {}: {}".format(ctx.author, error))
  
 bot.run(botProperties['botToken'])
 #bot.run(botProperties['botTestToken'])
