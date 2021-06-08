@@ -217,11 +217,6 @@ async def mint(ctx, total:int, decimals:int, assetName:str="", unitName:str="", 
        try:
            txid = algoNode.send_transaction(sATxn)
            wait_for_confirmation(algoNode, txid, 5)
-       except Exception as e:
-           await ctx.channel.send("Error Minting tokens for {0.author}. Failed to submit txn to Algorand Network: {1}".format(ctx, e))
-           print(type)
-           #print("Failed to send transaction")
-       try:
            ptx = algoNode.pending_transaction_info(txid)
            assetId = ptx["asset-index"]
            await send_embed(ctx, "[{0.author} successfully minted asset id #{1}](https://www.randgallery.com/algo-collection?address={2}&testnet)".format(ctx, assetId,assetId))
