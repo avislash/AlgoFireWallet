@@ -31,6 +31,9 @@ intents.members = True
 bot = commands.Bot(command_prefix='!', case_insensitive=True, intents=intents)
 algoNode = algod.AlgodClient(botProperties['algoNodeToken'], botProperties['algoNodeAddr'])
 
+algoExplorerBaseUrl = "https://testnet.algoexplorer.io"
+algoExplorerTxnUrl = algoExplorerBaseUrl+"/tx/{}"
+#algoExplorerTxnUrl = "[{}]("+algoExplorerBaseUrl+"/tx/{})"
 
 def wait_for_confirmation(client, transaction_id, timeout):
     start_round = client.status()["last-round"]+1;
@@ -85,6 +88,13 @@ def parseArgs(args):
     
 def generate_algorand_keypair():
     return account.generate_account()
+
+
+async def send_embed(ctx, msg):
+   embed = discord.Embed()
+   embed.description=msg
+   await ctx.send(embed=embed)
+    
 
 @bot.event
 async def on_ready():
@@ -145,9 +155,6 @@ async def mint(ctx, total:int, decimals:int, assetName:str="", unitName:str="", 
 
    #Parse Message for asset params
    try:
-       #print(options)
-       #:wargs = options.split(",")
-       #print(args)
        wallet = DiscordWallet.objects(userId=ctx.author.id)
 
        address = wallet[0]['address'] 
@@ -217,7 +224,7 @@ async def mint(ctx, total:int, decimals:int, assetName:str="", unitName:str="", 
        try:
            ptx = algoNode.pending_transaction_info(txid)
            assetId = ptx["asset-index"]
-           await ctx.channel.send("{0.author} successfully minted asset id #{1}: https://www.randgallery.com/algo-collection?address={2}&testnet".format(ctx, assetId,assetId))
+           await send_embed(ctx, "[{0.author} successfully minted asset id #{1}](https://www.randgallery.com/algo-collection?address={2}&testnet)".format(ctx, assetId,assetId))
        except Exception as e:
            await ctx.channel.send("Error Minting tokens for {0.author}: {1}".format(ctx, e))
            print(e)
@@ -393,7 +400,7 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
            unsigned_optin_txn = transaction.AssetTransferTxn(sender=recipientWallet['address'], sp=params, receiver=recipientWallet['address'], amt=0, index=asaId)
            asaTxferGroup.append(unsigned_optin_txn)
        except Exception as e:
-           await ctx.message.channel.send("Attention {} Unable to send {} {} (ASA ID# {}) to {} Failed to  generate optin xfer group: {}".format(ctx.author, amount, unitName, asaId, username, e))
+           await ctx.message.channel.send("Attention {} Unable to send {} {} (ASA ID# {}) to {} Failed to generate optin xfer group: {}".format(ctx.author, amount, unitName, asaId, username, e))
            return
 
    #print(assetInfo)
@@ -431,7 +438,7 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
 
    try:
        wait_for_confirmation(algoNode, txid, 5)
-       await ctx.channel.send("{} sent {} {} to {}".format(ctx.author, (asaAmtToSend*10**(-1*decimals)), unitName, username))
+       await send_embed(ctx, "[{} sent {} {} to {}]({})".format(ctx.author, (asaAmtToSend*10**(-1*decimals)), unitName, recipient, algoExplorerTxnUrl.format(txid)))
        await recipient.send("{} sent you {} {} ASA ID#{} {}".format(ctx.author, asaAmtToSend*10**(-1*decimals), unitName, asaId, ("with note: {}".format(note) if note else ""  )))
    except Exception as e:
        await ctx.channel.send("Attention {} Error sending ASA ID #{} to {} : {}".format(ctx.author, asaId, username, e))
@@ -514,11 +521,11 @@ async def send_algo(ctx, algo: float,  username: str, *, note:str=""):
        txid = algoNode.send_transaction(signed_tx)
        wait_for_confirmation(algoNode, txid, 5)
        await recipient.send("{} sent you {} ALGO {}".format(ctx.author, algo, ("with note: {}".format(note) if note else "" )))
-       await ctx.message.channel.send("{} Sent {} ALGO to {}".format(ctx.author, algo, username))
+       await send_embed(ctx, "[{} sent {} Algo to {}]({})".format(ctx.author, algo, bot.get_user(userId), algoExplorerTxnUrl.format(txid)))
    except Exception as err:
        await ctx.message.channel.send("Attention {} failed to send {} Algo to {}: {}".format(ctx.author, algo, username, err))
 
-@bot.command(name="withdrawAlgo", help="Send ALGO to external Algorand Account")
+@bot.command(name="withdrawAlgo", help="Send Algo to external Algorand Account")
 async def withdraw_algo(ctx, amount: float, address: str, *, note:str=""):
    wallet = DiscordWallet.objects(userId=ctx.author.id)
    if not wallet:
@@ -540,7 +547,7 @@ async def withdraw_algo(ctx, amount: float, address: str, *, note:str=""):
    try:
        txid = algoNode.send_transaction(signed_tx)
        wait_for_confirmation(algoNode, txid, 5)
-       await ctx.message.channel.send("{} Sent {} ALGO to {}".format(ctx.author, amount, address))
+       await send_embed(ctx,"[{} sent {} Algo to {}]({})".format(ctx.author, amount, address, algoExplorerTxnUrl.format(txid))) 
    except Exception as err:
        await ctx.message.channel.send("Attention {} failed to send {} ALGO to {}: {}".format(ctx.author, amount, address, err))
    
@@ -581,7 +588,7 @@ async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str
 
        txid = algoNode.send_transaction(signed_asaXfer)
        wait_for_confirmation(algoNode, txid, 5)
-       await ctx.channel.send("{} sent {} {} (ASA ID #{}) to {}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), unitName, asaId, address))
+       await send_embed(ctx, "[{} sent {} {} (ASA ID #{}) to {}]({})".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), unitName, asaId, address, algoExplorerTxnUrl.format(txid)))
    except Exception as err:
        print(err)
        await ctx.channel.send("{} Error Sending {} {} (ASA ID #{}) to {}:{}".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), unitName, asaId, address, err))
