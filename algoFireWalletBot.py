@@ -502,9 +502,6 @@ async def send_algo(ctx, algo: float,  username: str, *, note:str=""):
    if not DiscordWallet.objects(userId=ctx.author.id):
        await ctx.channel.send("No wallet exists for {0.author}. Create one using !mkWallet".format(ctx))
        return
-   #print(algo)
-   #print(username)
-   #print(note)
 
    if note:
        encodedNote = note.encode()
@@ -512,7 +509,6 @@ async def send_algo(ctx, algo: float,  username: str, *, note:str=""):
        encodedNote = None
 
    userId = int(username.strip("!@<>"), base=10)
-   #print(username)
    recipient = bot.get_user(userId)
    await recipient.create_dm()
 
@@ -534,7 +530,10 @@ async def send_algo(ctx, algo: float,  username: str, *, note:str=""):
 
    try:
        txid = algoNode.send_transaction(signed_tx)
-       wait_for_confirmation(algoNode, txid, 5)
+       with concurrent.futures.ThreadPoolExecutor() as executor:
+           future = executor.submit(wait_for_confirmation, algoNode, txid, 5)
+           await asyncio.sleep(5)
+           ret_value = future.result()
        await recipient.send("{} sent you {} ALGO {}".format(ctx.author, algo, ("with note: {}".format(note) if note else "" )))
        await send_embed(ctx, "[{} sent {} Algo to {}]({})".format(ctx.author, algo, bot.get_user(userId), algoExplorerTxnUrl.format(txid)))
    except Exception as err:
@@ -604,7 +603,7 @@ async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str
 
    decimals = assetInfo['asset']['params']['decimals']
    asaAmtToSend = int(amount * (10**decimals))
-   #print("Address len {}".format(len(address)))
+
    try:
        unsigned_asaXfer = transaction.AssetTransferTxn(sender=wallet['address'], sp=algoNode.suggested_params(), receiver=address, amt=asaAmtToSend, index=asaId, note=encodedNote)
        signed_asaXfer = unsigned_asaXfer.sign(wallet['ppk'])
