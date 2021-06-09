@@ -641,18 +641,36 @@ async def distribute(ctx, amount: float,  asaId: int, role:discord.Role, *, note
 
    numMembers = len(role.members)
    await ctx.channel.send("Beginning ASA ID #{} distribution to {} members in {}".format(asaId, numMembers, role))
+   start = datetime.now()
+   print("Start time {}".format(datetime.now()))
+
+   tasks = []
+   loop = asyncio.get_event_loop()
    for member in role.members:
        try:
            username = "<@!{}>".format(member.id) #convert member.id to an @discord_username (this gets rendered to the proper username in discord chat)
-           await send_asa(ctx=ctx, amount=amount, username=username, asaId=asaId, note=note)
+           tasks.append(loop.create_task(send_asa(ctx=ctx, amount=amount, username=username, asaId=asaId, note=note)))
        except Exception as e:
-           await ctx.channel.send("Attention {} - Failed to distribute ASA ID #{} to {}: {}".format(ctx.author, asaId, uesrname, e))
+           await ctx.channel.send("Attention {} - Failed to distribute ASA ID #{} to {}: {}".format(ctx.author, asaId, username, e))
+   for task in tasks:
+       while False == task.done():
+           await asyncio.sleep(1)
+
+   end = datetime.now()
+   print("Total time to run: {}s".format((end-start).total_seconds()))
    await ctx.channel.send("ASA ID#{} distribution for {} in {} finished".format(asaId, numMembers, role))
 
 @distribute.error
 async def distribute_error(ctx, error):
     await ctx.send("Failed to execute !distributeASA for {}: {}".format(ctx.author, error))
  
+
+#setup logger
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(filename="discord.log",encoding='utf-8', mode='w')
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 bot.run(botProperties['botToken'])
 #bot.run(botProperties['botTestToken'])
 #bot.run(TOKEN)
