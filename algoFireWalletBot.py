@@ -8,12 +8,18 @@ import json
 import time
 import base64
 import pickle 
+import logging
 from db.DiscordWallet import DiscordWallet
 from mongoengine import connect
 from pymongo.encryption_options import AutoEncryptionOpts
 from pymongo.errors import EncryptionError
 from bson import json_util
-
+from datetime import datetime 
+import asyncio 
+import concurrent.futures
+import threading 
+lock = asyncio.Lock()
+algoLock = asyncio.Lock()
 propertyFile= "filename" #define name of file that holds all relevant bot properties here
 with open(propertyFile, 'rb') as input:
     botProperties = pickle.load(input)
@@ -334,12 +340,11 @@ async def optout_error(ctx, error):
     await ctx.send("Failed to execute !remove-asa for {}: {}".format(ctx.author, error))
        
 @bot.command(name="sendASA", help="Send Algorand ASA to Discord User")
-async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
+async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""): 
    senderWallet = DiscordWallet.objects(userId=ctx.author.id)
    if not senderWallet:
        await ctx.channel.send("No wallet exists for {0.author}. Create one using !mkWallet".format(ctx))
        return
-  
 
    if note:
        encodedNote = note.encode()
@@ -352,7 +357,7 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
    optRecipientIn = True
    newWallet = False
    recipientWallet  = DiscordWallet.objects(userId=recipientId)
-   
+
    #Make sure sender is opted into asset they're trying to send
    account_info = algoNode.account_info(senderWallet['address'])
    foundAsset = False
@@ -370,6 +375,7 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
        wallet.save()
        recipientWallet = DiscordWallet.objects(userId=recipientId)[0]
        zeroBalance = True
+       
        await recipient.send("New Wallet Created: {}".format(address))
        await ctx.message.channel.send("New Wallet Created for {0.name}".format(recipient))
    else:
@@ -410,7 +416,6 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
            await ctx.message.channel.send("Attention {} Unable to send {} {} (ASA ID# {}) to {} Failed to generate optin xfer group: {}".format(ctx.author, amount, unitName, asaId, username, e))
            return
 
-   #print(assetInfo)
    decimals = assetInfo['asset']['params']['decimals']
    asaAmtToSend = int(amount * (10**decimals))
    
@@ -438,17 +443,17 @@ async def send_asa(ctx, amount:float, asaId:int, username:str, *, note:str=""):
            txid = algoNode.send_transactions(signed_group)
        else:
            signedAsaXfer = asaTxferGroup[0].sign(senderWallet['ppk'])
-           txid = algoNode.send_transaction(signedAsaXfer)
+           txid = algoNode.send_transactions([signedAsaXfer])
+
+       with concurrent.futures.ThreadPoolExecutor() as executor:
+           future = executor.submit(wait_for_confirmation, algoNode, txid, 5)
+           await asyncio.sleep(5)
+           ret_value = future.result()
+           await send_embed(ctx, "[{} sent {} {} to {}]({})".format(ctx.author, (asaAmtToSend*10**(-1*decimals)), unitName, recipient, algoExplorerTxnUrl.format(txid)))
+           await recipient.send("{} sent you {} {} ASA ID#{} {}".format(ctx.author, asaAmtToSend*10**(-1*decimals), unitName, asaId, ("with note: {}".format(note) if note else ""  )))
    except Exception as e:
        await ctx.channel.send("Attention {} Error sending ASA ID #{} to {} : {}".format(ctx.author, asaId, username, e))
        return
-
-   try:
-       wait_for_confirmation(algoNode, txid, 5)
-       await send_embed(ctx, "[{} sent {} {} to {}]({})".format(ctx.author, (asaAmtToSend*10**(-1*decimals)), unitName, recipient, algoExplorerTxnUrl.format(txid)))
-       await recipient.send("{} sent you {} {} ASA ID#{} {}".format(ctx.author, asaAmtToSend*10**(-1*decimals), unitName, asaId, ("with note: {}".format(note) if note else ""  )))
-   except Exception as e:
-       await ctx.channel.send("Attention {} Error sending ASA ID #{} to {} : {}".format(ctx.author, asaId, username, e))
      
 @send_asa.error
 async def send_asa_error(ctx, error):
