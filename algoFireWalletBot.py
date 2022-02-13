@@ -20,7 +20,7 @@ import concurrent.futures
 import threading 
 lock = asyncio.Lock()
 algoLock = asyncio.Lock()
-propertyFile= "filename" #define name of file that holds all relevant bot properties here
+propertyFile= "afw.props" #define name of file that holds all relevant bot properties here
 with open(propertyFile, 'rb') as input:
     botProperties = pickle.load(input)
 
@@ -239,7 +239,7 @@ async def mint(ctx, total:int, decimals:int, assetName:str="", unitName:str="", 
 async def mint_error(ctx, error):
     await ctx.send("Failed to execute !mint for {}: {}".format(ctx.author, error))
 
-@bot.command(name="add-asa", help="Add ASA to account")
+@bot.command(name="add-asa", help="Add ASA to account", aliases=['addASA'])
 async def optin(ctx, asaId: int):
    wallet = DiscordWallet.objects(userId=ctx.author.id)
    if not wallet:
@@ -290,7 +290,7 @@ async def optin(ctx, asaId: int):
 async def optin_error(ctx, error):
     await ctx.send("Failed to execute !add-asa for {}: {}".format(ctx.author, error))
 
-@bot.command(name="remove-asa", help="Remove ASA from account")
+@bot.command(name="remove-asa", help="Remove ASA from $account", aliases=['removeASA'])
 async def optout(ctx, asaId: int):
    wallet = DiscordWallet.objects(userId=ctx.author.id)
    if not wallet:
@@ -564,7 +564,10 @@ async def withdraw_algo(ctx, amount: float, address: str, *, note:str=""):
    
    try:
        txid = algoNode.send_transaction(signed_tx)
-       wait_for_confirmation(algoNode, txid, 5)
+       with concurrent.futures.ThreadPoolExecutor() as executor:
+           future = executor.submit(wait_for_confirmation, algoNode, txid, 5)
+           await asyncio.sleep(5)
+           ret_value = future.result()
        await send_embed(ctx,"[{} sent {} Algo to {}]({})".format(ctx.author, amount, address, algoExplorerTxnUrl.format(txid))) 
    except Exception as err:
        await ctx.message.channel.send("Attention {} failed to send {} ALGO to {}: {}".format(ctx.author, amount, address, err))
@@ -608,7 +611,10 @@ async def withdrawASA(ctx, amount: float,  asaId: int, address: str, *, note:str
        unsigned_asaXfer = transaction.AssetTransferTxn(sender=wallet['address'], sp=algoNode.suggested_params(), receiver=address, amt=asaAmtToSend, index=asaId, note=encodedNote)
        signed_asaXfer = unsigned_asaXfer.sign(wallet['ppk'])
 
-       txid = algoNode.send_transaction(signed_asaXfer)
+       with concurrent.futures.ThreadPoolExecutor() as executor:
+           future = executor.submit(wait_for_confirmation, algoNode, txid, 5)
+           await asyncio.sleep(5)
+           ret_value = future.result()
        wait_for_confirmation(algoNode, txid, 5)
        await send_embed(ctx, "[{} sent {} {} (ASA ID #{}) to {}]({})".format(ctx.author, asaAmtToSend*(10**(-1*decimals)), unitName, asaId, address, algoExplorerTxnUrl.format(txid)))
    except Exception as err:
@@ -664,6 +670,15 @@ async def distribute(ctx, amount: float,  asaId: int, role:discord.Role, *, note
 async def distribute_error(ctx, error):
     await ctx.send("Failed to execute !distributeASA for {}: {}".format(ctx.author, error))
  
+@bot.command(name="uri", help="Test do not use")
+async def uri(ctx):#, amount: float,  asaId: int, role:discord.Role, *, note:str=""):
+    #await send_embed(ctx, "<algorand://TMTAD6N22HCS2LKH7677L2KFLT3PAQWY6M4JFQFXQS32ECBFC23F57RYX4?amount=50000&asset=31566704>")
+    #await send_embed(ctx, "[{}]({})".format("sign here", "https://algorand//TMTAD6N22HCS2LKH7677L2KFLT3PAQWY6M4JFQFXQS32ECBFC23F57RYX4?amount=50000&asset=31566704"))
+    await send_embed(ctx, "[{}]({})".format("sign here", "https://algorand://TMTAD6N22HCS2LKH7677L2KFLT3PAQWY6M4JFQFXQS32ECBFC23F57RYX4?amount=50000&asset=31566704"))
+    #embed = discord.Embed()
+    #embed.description="Sign"
+    #embed.url = "https://algorand.com/?link=algorand://t"
+    await ctx.send(embed=embed)
 
 #setup logger
 logger = logging.getLogger('discord')
